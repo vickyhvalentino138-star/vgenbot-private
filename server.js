@@ -1098,7 +1098,10 @@ app.post('/deploy-key', (req, res) => {
     res.json({ success: true, message: "Koneksi VGenRemote Sukses & Permanen!" });
 });
 
-app.listen(8080, () => {
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server jalan di port ${PORT}`);
+});
     logSys('\n==================================================');
     logSys('    🔥 [ VGEN AI LINK API AKTIF DI PORT 8080 ]');
     logSys('==================================================');
