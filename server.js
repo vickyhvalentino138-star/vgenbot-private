@@ -1105,7 +1105,6 @@ app.listen(PORT, '0.0.0.0', () => {
     logSys('\n==================================================');
     logSys('    🔥 [ VGEN AI LINK API AKTIF DI PORT 8080 ]');
     logSys('==================================================');
-});
 
 // Jalankan Bot
 startBot();
