@@ -1,10 +1,10 @@
 /**
  * =========================================================================
- * ★ VGEN AI TERMINAL (ULTIMATE LITE - STRICT EDITION) ★
+ * ★ VGEN AI TERMINAL (ULTIMATE LITE - STRICT EDITION + MEMORY) ★
  * =========================================================================
  * Arsitektur khusus AI Core dan sistem deployment.
- * Semua fitur sampingan dihapus sesuai perintah otoritas.
  * MESIN: BAILEYS MURNI.
+ * DITAMBAHKAN: Sistem Ingatan (Context History) untuk AI.
  * =========================================================================
 */
 
@@ -23,7 +23,7 @@ const {
 
 // Pastikan file prompt.js ada
 let vgenPrompt = "";
-try { vgenPrompt = require('./prompt.js'); } catch (e) { vgenPrompt = "Kamu adalah VGen AI."; }
+try { vgenPrompt = require('./prompt.js'); } catch (e) { vgenPrompt = "Kamu adalah VGen AI, asisten yang cerdas dan efisien."; }
 
 const app = express();
 app.use(cors());
@@ -39,7 +39,7 @@ function logErr(msg) { console.log(`${c.r}[ERROR] ${msg}${c.rst}`); }
 function logSys(msg) { console.log(`${c.c}[SYSTEM] ${msg}${c.rst}`); }
 
 // =========================================================================
-// 🗄️ VARIABEL GLOBAL & REMOTE CONFIG
+// 🗄️ VARIABEL GLOBAL, MEMORY & REMOTE CONFIG
 // =========================================================================
 const dbFile = './database.json';
 let db = { apiConfig: {} };
@@ -57,8 +57,12 @@ let activeApiKey = db.apiConfig?.apiKey || null;
 let activeModel = db.apiConfig?.model || null; 
 let isAiMuted = false; 
 
-// 🔥 TARGET EKSKLUSIF (HANYA MERESPON 2 NOMOR INI)
-const ALLOWED_NUMBERS = ["6281292729210", "6289668591566"];
+// 🔥 TARGET EKSKLUSIF (HANYA MERESPON NOMOR INI)
+const ALLOWED_NUMBERS = ["6281292729210", "6289668591566", "6289674003035"];
+
+// 🧠 SISTEM INGATAN AI (CHAT HISTORY)
+const userHistory = {};
+const MAX_HISTORY = 6; // Menyimpan 6 pesan terakhir agar konteks nyambung
 
 // Fungsi Download Media
 async function downloadMediaBaileys(message, type) {
@@ -82,7 +86,7 @@ async function startBot() {
     sock = makeWASocket({
         auth: state,
         printQRInTerminal: true,
-        markOnlineOnConnect: true, // 🔥 WAJIB STATUS ONLINE
+        markOnlineOnConnect: true,
         logger: pino({ level: 'silent' }),
         browser: ['VGen AI Ultimate', 'Mac OS', 'Safari']
     });
@@ -95,7 +99,6 @@ async function startBot() {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) startBot();
         } else if (connection === 'open') {
-            // 🔥 PAKSA UPDATE PRESENCE KE AVAILABLE BIAR ONLINE TERUS
             await sock.sendPresenceUpdate('available');
             
             console.log(`\n==================================================`);
@@ -111,7 +114,7 @@ async function startBot() {
         if (!msg.message) return;
 
         const from = msg.key.remoteJid;
-        if (from.endsWith('@g.us') || from === 'status@broadcast') return;
+        if (from.endsWith('@g.us') || from === 'status@broadcast') return; // Mengabaikan Grup dan Status Story WA
 
         let senderJid = msg.key.fromMe ? sock.user.id : (msg.key.participant || from);
         let pengirimRaw = senderJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
@@ -128,23 +131,23 @@ async function startBot() {
         else if (type === 'stickerMessage') { hasMedia = true; }
 
         const bodyTrimmed = pesanTeks.toLowerCase().trim();
-        const isCmd = pesanTeks.startsWith('!') || pesanTeks.startsWith('.');
 
         const reply = async (text) => {
             return await sock.sendMessage(from, { text: text }, { quoted: msg });
         };
 
         // =========================================================================
-        // 🔒 KONTROL MUTE / UNMUTE 
+        // 🔒 KONTROL MUTE / UNMUTE (RESET HISTORY JIKA MUTE)
         // =========================================================================
         if (bodyTrimmed === '.mute' || bodyTrimmed === '.unmute') {
             if (bodyTrimmed === '.mute') { 
-                if (isAiMuted) return reply("Status respon AI saat ini sudah dalam keadaan nonaktif. Anda tidak perlu mengulang perintah ini.");
+                if (isAiMuted) return reply("Status respon AI saat ini sudah dalam keadaan nonaktif.");
                 isAiMuted = true; 
+                delete userHistory[from]; 
                 return reply("Respon AI telah dinonaktifkan secara sistem."); 
             }
             if (bodyTrimmed === '.unmute') { 
-                if (!isAiMuted) return reply("Status respon AI saat ini sudah dalam keadaan aktif. Anda tidak perlu mengulang perintah ini.");
+                if (!isAiMuted) return reply("Status respon AI saat ini sudah aktif.");
                 isAiMuted = false; 
                 return reply("Respon AI telah diaktifkan kembali."); 
             }
@@ -153,12 +156,15 @@ async function startBot() {
         // =========================================================================
         // 🛡️ FILTER ABSOLUT 
         // =========================================================================
-        if (msg.key.fromMe) return; // Ketikan asli human diabaikan AI
-        if (!ALLOWED_NUMBERS.includes(pengirimRaw)) return; // Hanya sikat 2 nomor whitelist
-        if (isAiMuted) return; // Kalo lagi di mute, diem
+        if (msg.key.fromMe) return; 
+        if (!ALLOWED_NUMBERS.includes(pengirimRaw)) return; 
+        if (isAiMuted) return; 
+
+        // Inisialisasi memori user jika belum ada
+        if (!userHistory[from]) userHistory[from] = [];
 
         // =========================================================================
-        // 🧠 AI HYBRID CORE
+        // 🧠 AI HYBRID CORE (DENGAN CONTEXT-REPLY YANG AKURAT)
         // =========================================================================
         let finalPrompt = pesanTeks.trim();
         let base64Media = null; 
@@ -174,6 +180,7 @@ async function startBot() {
             if (hasQuotedMedia) {
                 quotedMediaMsg = quotedMsg.quotedMessage; 
             }
+            // Mengambil teks asli dari bubble chat lawan yang di-reply
             const quotedText = quotedMsg.quotedMessage?.conversation || quotedMsg.quotedMessage?.extendedTextMessage?.text;
             if (quotedText) finalPrompt = `[Konteks reply: "${quotedText}"]\n\nRespon untuk: ${finalPrompt}`;
         }
@@ -185,7 +192,7 @@ async function startBot() {
         if (finalPrompt !== "" || hasMedia || quotedMediaMsg) {
             if (!activeApiKey) return reply("Sistem: API Key belum terhubung ke mesin port 8080.");
             
-            // 🔥 NYALAKAN STATUS MENGETIK PAS AI LAGI MIKIR
+            // 🔥 STATUS MENGETIK DIKIRIM HANYA KE ROOM TARGET ('from')
             await sock.sendPresenceUpdate('composing', from);
             
             try {
@@ -203,26 +210,37 @@ async function startBot() {
                 }
 
                 if (activeProvider === 'OPENAI') {
+                    const openAiMessages = [
+                        { role: "system", content: vgenPrompt },
+                        ...userHistory[from].map(h => ({ role: h.role, content: h.content })),
+                        { role: "user", content: finalPrompt }
+                    ];
+
                     const res = await fetch('https://api.openai.com/v1/chat/completions', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeApiKey}` },
-                        body: JSON.stringify({
-                            model: activeModel,
-                            messages: [{ role: "system", content: vgenPrompt }, { role: "user", content: finalPrompt }]
-                        })
+                        body: JSON.stringify({ model: activeModel, messages: openAiMessages })
                     });
                     const data = await res.json();
                     if (data.error) throw new Error(data.error.message);
                     if (data.choices && data.choices.length > 0) aiResponse = data.choices[0].message.content;
                 }
                 else if (activeProvider === 'GEMINI') {
-                    let partsPayload = [{ text: finalPrompt }];
-                    if (base64Media) partsPayload.push({ inline_data: { mime_type: mimeTypeMedia || "image/jpeg", data: base64Media } });
+                    let geminiContents = userHistory[from].map(h => ({
+                        role: h.role === 'assistant' ? 'model' : 'user',
+                        parts: [{ text: h.content }]
+                    }));
                     
+                    let currentParts = [{ text: finalPrompt }];
+                    if (base64Media) {
+                        currentParts.push({ inline_data: { mime_type: mimeTypeMedia || "image/jpeg", data: base64Media } });
+                    }
+                    geminiContents.push({ role: "user", parts: currentParts });
+
                     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${activeApiKey}`, {
                         method: 'POST', 
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ system_instruction: { parts: [{ text: vgenPrompt }] }, contents: [{ parts: partsPayload }] })
+                        body: JSON.stringify({ system_instruction: { parts: [{ text: vgenPrompt }] }, contents: geminiContents })
                     });
                     const data = await res.json();
                     if (data.error) throw new Error(data.error.message);
@@ -233,11 +251,19 @@ async function startBot() {
                     const timeNow = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
                     const finalOutput = `${aiResponse.trim()}\n\n*(AI) - ${timeNow}*`;
                     await reply(finalOutput);
+
+                    // Simpan history chat
+                    userHistory[from].push({ role: 'user', content: finalPrompt });
+                    userHistory[from].push({ role: 'assistant', content: aiResponse });
+                    
+                    if (userHistory[from].length > MAX_HISTORY) {
+                        userHistory[from] = userHistory[from].slice(-MAX_HISTORY);
+                    }
                 }
             } catch (error) {
                 logErr("\n❌ AI Core Error: " + error.message);
-            } finally {
-                // 🔥 MATIKAN STATUS MENGETIK SETELAH PESAN TERKIRIM
+            } Transformer: finally {
+                // 🔥 MATIKAN STATUS MENGETIK SETELAH SELESAI
                 await sock.sendPresenceUpdate('paused', from);
             }
         }
@@ -266,9 +292,8 @@ app.post('/deploy-key', (req, res) => {
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
     logSys('\n==================================================');
-    logSys(`    🔥 [ VGEN AI LINK API AKTIF DI PORT ${PORT} ]`);
+    logSys(`    ✅ [ VGEN AI API UDAH AKTIF DI PORT ${PORT} ]`);
     logSys('==================================================');
 });
 
 startBot();
-        
