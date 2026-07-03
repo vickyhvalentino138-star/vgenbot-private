@@ -64,7 +64,7 @@ const INITIAL_LIMIT = 5;
 
 let db = {
     owners: ["62895410975149"], 
-    vips: ["6289668591566"], 
+    vips: ["6289668591566", "6281292729210"], 
     premiums: [],
     limits: {},
     logs: {}, 
@@ -618,16 +618,10 @@ ${r6}  ╚═══╝  ${r7} ╚═════╝ ${r1}╚══════�
                             deviceListMetadataVersion: 2
                         },
                         interactiveMessage: proto.Message.InteractiveMessage.create({
-                            contextInfo: { 
-                                stanzaId: 'WhatsApp', 
-                                participant: '0@s.whatsapp.net', 
-                                remoteJid: 'status@broadcast',
-                                quotedMessage: { 
-                                    contactMessage: {
-                                        displayName: "VGen AI", 
-                                        vcard: "BEGIN:VCARD\nVERSION:3.0\nN:;VGen AI;;;\nFN:VGen AI\nORG:VGen AI\nEND:VCARD"
-                                    }
-                                }
+                           contextInfo: { 
+                               stanzaId: msg.key.id, 
+                                participant: msg.key.fromMe ? sock.user.id : (msg.key.participant || from), 
+                                quotedMessage: msg.message 
                             },
                             body: proto.Message.InteractiveMessage.Body.create({ text: menuBase }),
                             footer: proto.Message.InteractiveMessage.Footer.create({ text: "© VGen AI (Revolution AI)" }),
@@ -1064,7 +1058,7 @@ ${r6}  ╚═══╝  ${r7} ╚═════╝ ${r1}╚══════�
     image: Buffer.from(base64Media, 'base64'), 
     caption: `*Akun Ditemukan!*\n\n${aiResponse.trim()}\u200B`}, { quoted: getDynamicStatusQuote(pesanTeks) });
                     } else {
-                        if (isNaturalChat && isOwnerVerified) {
+                          if (isNaturalChat && isOwnerVerified && isOwner) {
                             await verifiedReply(`${aiResponse.trim()}\u200B`);
                         } else {
                             await reply(`${aiResponse.trim()}\u200B`);
