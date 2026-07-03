@@ -58,7 +58,7 @@ let activeModel = db.apiConfig?.model || null;
 let isAiMuted = false; 
 
 // 🔥 TARGET EKSKLUSIF (HANYA MERESPON NOMOR INI)
-const ALLOWED_NUMBERS = ["6281292729210", "6289668591566", "6289674003035"];
+const ALLOWED_NUMBERS = ["6281292729210", "6289668591566"];
 
 // 🧠 SISTEM INGATAN AI (CHAT HISTORY)
 const userHistory = {};
@@ -262,7 +262,7 @@ async function startBot() {
                 }
             } catch (error) {
                 logErr("\n❌ AI Core Error: " + error.message);
-            } Transformer: finally {
+            } finally {
                 // 🔥 MATIKAN STATUS MENGETIK SETELAH SELESAI
                 await sock.sendPresenceUpdate('paused', from);
             }
