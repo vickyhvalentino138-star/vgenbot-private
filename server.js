@@ -1025,7 +1025,7 @@ ${r6}  ╚═══╝  ${r7} ╚═════╝ ${r1}╚══════�
                             'Authorization': `Bearer ${activeApiKey}`
                         },
                         body: JSON.stringify({
-                            model: activeModel || "gpt-5.4-mini",
+                            model: activeModel,
                             messages: [
                                 { role: "system", content: vgenPrompt },
                                 { role: "user", content: finalPrompt }
@@ -1084,18 +1084,19 @@ ${r6}  ╚═══╝  ${r7} ╚═════╝ ${r1}╚══════�
 app.post('/deploy-key', (req, res) => {
     const { apiKey, provider, model } = req.body;
 
-    if (!apiKey) {
-        return res.status(400).json({ error: "API Key kosong!" });
+    if (!apiKey || !model) {
+        return res.status(400).json({ error: "API Key atau Model tidak boleh kosong!" });
     }
+    
     activeApiKey = apiKey;
-    activeProvider = provider ? provider.toUpperCase() : null; 
-    activeModel = model || "gpt-5.4-mini"; 
+    activeProvider = provider ? provider.toUpperCase() : "OPENAI"; 
+    activeModel = model;
 
-    db.apiConfig = { apiKey, provider, model: activeModel };
+    db.apiConfig = { apiKey: activeApiKey, provider: activeProvider, model: activeModel };
     saveDb();
 
-    console.log(`[REMOTE] API Key ${activeProvider} berhasil dipasang & disimpan permanen!`);
-    res.json({ success: true, message: "Koneksi VGenRemote Sukses & Permanen!" });
+    console.log(`[REMOTE] Sukses! Provider: ${activeProvider} | Model: ${activeModel}`);
+    res.json({ success: true, message: `Sukses terhubung ke model: ${activeModel}` });
 });
 
 const PORT = process.env.PORT || 8080;
