@@ -618,10 +618,17 @@ ${r6}  ╚═══╝  ${r7} ╚═════╝ ${r1}╚══════�
                             deviceListMetadataVersion: 2
                         },
                         interactiveMessage: proto.Message.InteractiveMessage.create({
-                           contextInfo: { 
-                               stanzaId: msg.key.id, 
+                        contextInfo: { 
+                                stanzaId: msg.key.id, 
                                 participant: msg.key.fromMe ? sock.user.id : (msg.key.participant || from), 
-                                quotedMessage: msg.message 
+                                quotedMessage: msg.message,
+                                isForwarded: true, 
+                                forwardingScore: 9999, 
+                                forwardedNewsletterMessageInfo: { 
+                                    newsletterJid: "120363297119642597@newsletter", 
+                                    serverMessageId: -1, 
+                                    newsletterName: "VGen AI Ultimate" 
+                                }
                             },
                             body: proto.Message.InteractiveMessage.Body.create({ text: menuBase }),
                             footer: proto.Message.InteractiveMessage.Footer.create({ text: "© VGen AI (Revolution AI)" }),
