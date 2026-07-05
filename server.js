@@ -160,8 +160,13 @@ async function startBot() {
         const pushname = msg.pushName || 'Verified User';
 
 
-             // ⌨️ FITUR STATUS MENGETIK OTOMATIS (UDAH AMAN MUTLAK!)
-        await sock.sendPresenceUpdate('composing', from);
+         // 🎙️ FITUR MEREKAM AUDIO KEBINGUNGAN (RUMUS MATEMATIKA 10-30 DETIK)
+        // Menggunakan gelombang Sinus absolut dari waktu (Date.now) untuk ngacak durasi
+        const durasiMerekam = Math.floor((Math.abs(Math.sin(Date.now())) * 20) + 10) * 1000;
+        await sock.sendPresenceUpdate('recording', from);
+        setTimeout(async () => { 
+            await sock.sendPresenceUpdate('paused', from); 
+        }, durasiMerekam);
 
         // Filter struktur pesan modern agar engine tidak salah baca (Support Pesan Sementara/Ephemeral)
         let realMsg = msg.message;
